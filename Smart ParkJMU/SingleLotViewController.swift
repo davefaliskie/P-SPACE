@@ -7,8 +7,10 @@
 //
 
 import UIKit
+import MapKit
+import CoreLocation
 
-class SingleLotViewController: UIViewController, UITableViewDataSource, UIPickerViewDataSource, UIPickerViewDelegate {
+class SingleLotViewController: UIViewController, UITableViewDataSource, UIPickerViewDataSource, UIPickerViewDelegate, CLLocationManagerDelegate, MKMapViewDelegate  {
     
     var refreshControl:UIRefreshControl!
     
@@ -20,6 +22,8 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
     
     var unique_tag_ids = Array<String>()
     var occupied_spots = Int()
+    
+    
     
     
     
@@ -44,22 +48,38 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
     @IBOutlet weak var satSunTitleLabel: UILabel!
     @IBOutlet weak var satSunHoursAvailabilityLabel: UILabel!
     @IBOutlet weak var timeLoadingHoursAvailabilityLabel: UILabel!
-
+    @IBOutlet weak var eta: UILabel!
+    @IBOutlet weak var backupLot: UILabel!
+    
+    // varialble for probability 
+    var unwrapped_eta = Int()
+    var historical_current_available = Int()
+    var historical_arrival_available = Int()
+    var historical_rate = Int()
+    var lot_capacity = Int()
+    
+    @IBOutlet weak var probability: UILabel!
+    @IBAction func update(sender: AnyObject) {
+        calculateProbability(self.lot_capacity)
+        print("LOT CAP", self.lot_capacity)
+        
+    }
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         setup()
-        
-    }
+        loadMap()
 
+    }
+    
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
     }
     
-    override func viewWillAppear(animated: Bool) {
-        super.viewWillAppear(animated)
-    }
+   
     
     // Function run when view is loading
     func setup() {
@@ -77,6 +97,13 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
         // Sets lot name and location to lot name and location returned from GET request getLotData from lot id
         lotNameLabel.text = lot["Lot_Name"] as? String
         lotLocationLabel.text = lot["Location"] as? String
+        backupLot.text = lot["Backup"] as? String
+        
+        // Get lot Latitude and Longitude
+        //let LotLatitude = lot["Latitude"] as? Double
+        //let LotLongitude = lot["Longitude"] as? Double
+        
+       
         
         // Sets lot names and spot availabilities array to be displayed
         updateLotNames()
@@ -93,6 +120,310 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
         
 
     }
+    
+    
+    // Finding Location ************************
+    
+        
+    @IBOutlet weak var map: MKMapView!
+    
+    let locationManager = CLLocationManager()
+    var manager:CLLocationManager!
+    var myLocations: [CLLocation] = []
+    
+    func loadMap() {
+        //   Code for getting the current location
+        self.locationManager.delegate = self
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        self.locationManager.requestAlwaysAuthorization()
+        self.locationManager.startUpdatingLocation()
+        
+        //Setup our Map View
+        map.delegate = self
+        map.mapType = MKMapType.Satellite
+        map.showsUserLocation = true
+    }
+    
+    func locationManager(manager:CLLocationManager, didUpdateLocations locations:[CLLocation]) {
+        
+        myLocations.append(locations[0] )
+        
+        let currentLocation = map.userLocation.coordinate
+        
+        let mapSpan = MKCoordinateSpanMake(0.01, 0.01)
+        
+        let mapRegion = MKCoordinateRegionMake(currentLocation, mapSpan)
+        
+        self.map.setRegion(mapRegion, animated: true)
+        
+        let userLocation = CLLocationCoordinate2D(latitude: currentLocation.latitude as Double, longitude: currentLocation.longitude as Double)
+        
+        
+        // Sets lot variable to returned lot from GET request getLotData from lot id
+        lot = SingleLotViewController.getLotData(lotId)[0] as! NSDictionary
+        
+        // Sets lot location from lot id
+        let LotLatitude = lot["Latitude"]!.floatValue
+        let LotLongitude = lot["Longitude"]!.floatValue
+        let location = CLLocationCoordinate2D(latitude: Double(LotLatitude), longitude: Double(LotLongitude))
+        
+        // Calculate Transit ETA Request
+        let request = MKDirectionsRequest()
+        
+        /* Source MKMapItem */
+        let sourceItem = MKMapItem(placemark: MKPlacemark(coordinate: userLocation , addressDictionary: nil))
+        request.source = sourceItem
+        
+        /* Destination MKMapItem */
+        let destinationItem = MKMapItem(placemark: MKPlacemark(coordinate: location, addressDictionary: nil))
+        request.destination = destinationItem
+        request.requestsAlternateRoutes = false
+        
+        // Looking for Transit directions, set the type to Transit
+        request.transportType = .Automobile
+        
+        // Center the map region around the restaurant coordinates
+        map.setCenterCoordinate(location, animated: true)
+        
+        
+        var eta = 0
+        
+        // You use the MKDirectionsRequest object constructed above to initialise an MKDirections object
+        let directions = MKDirections(request: request)
+        directions.calculateETAWithCompletionHandler { (etaResponse, error) -> Void in
+            if let error = error {
+                print("Error while requesting ETA : \(error.localizedDescription)")
+            }else{
+                eta = Int((etaResponse?.expectedTravelTime)!/60)
+                self.eta.text = "ETA: \(eta) mins"
+                self.unwrapped_eta = eta
+                
+                
+            }
+            
+        }
+        
+        
+    }
+    
+
+    func calculateProbability(lotCapacity: Int) {
+        // data variables retrieved and saved as global variables 
+        
+        // Current Available Spots: self.occupied_spots
+        // ETA from current location to selected Lot: self.unwrapped_eta
+        // Historical Available Sptos @ arrival: self.historical_arrival_available
+        // Historical Available Spots @ current time: self.historical_current_available
+        
+        
+        // call todays date function
+        let todaysDate = getTodaysDate()
+        
+        // Get arrival time based on calculated ETA
+        let arrivalTime = getArrivalTime(self.unwrapped_eta)
+//        let newarrivalTime = getArrivalTime(700)
+        
+        // call getHistoricalData function format (lotID, todaysDate, current time). This will set self.historical_available
+        getHistoricalData(1, day: todaysDate, time: arrivalTime)
+
+        
+        // get probability
+        if self.historical_arrival_available == 0 {
+            // set probability label to probability
+            self.probability.text = "No available spots"
+        }else{
+            let available = Double(self.historical_arrival_available)
+            let getProbability: Double = 100 - (((Double(lotCapacity) - available) / Double(lotCapacity)) * 100)
+            // set probability label to probability
+            self.probability.text = "\(round(getProbability)) %"
+        }
+        
+        
+        // historical_rate is the available spots 30 minutes in the future
+        
+        print("HISTORICAL Arrival:", self.historical_arrival_available)
+        
+        
+        
+        
+        
+    }
+    
+    
+    
+    // function to get historical data for a specific lot at a specific time. will set historical_available to the available spots
+    func getHistoricalData(lotId: Int, day: Int, time: String) {
+        // connect to the historical data API
+        let requestURL: NSURL = NSURL(string: "http://127.0.0.1:5000/")!
+        let urlRequest: NSMutableURLRequest = NSMutableURLRequest(URL: requestURL)
+        let session = NSURLSession.sharedSession()
+        let new_task = session.dataTaskWithRequest(urlRequest) {
+            (data, response, error) -> Void in
+            
+            let httpResponse = response as! NSHTTPURLResponse
+            let statusCode = httpResponse.statusCode
+            
+            if (statusCode == 200) {
+                //print("File downloaded successfully.")
+                do{
+                    
+                    let json = try NSJSONSerialization.JSONObjectWithData(data!, options:.AllowFragments)
+                    
+                    if let historicalData = json as? [[String: AnyObject]] {
+                        
+                        for data in historicalData {
+                            // get sign ID from JSON
+                            if let SignID = data["SignID"] as? Int {
+                                // ***filter by specific lot
+                                if lotId == SignID {
+                                    // get data on day and time
+                                    if let RetrievalTime = data["RetrievalTime"] {
+                                        
+                                        // prepare RetrievalTime to be split into day and time
+                                        let breakTime = RetrievalTime as! String + " "
+                                        // split breakTime into Array of day and time
+                                        let breakTimeArr = breakTime.componentsSeparatedByString(" ")
+                                        
+                                        // make variable for date
+                                        let RetrievalDate = breakTimeArr[0]
+                                        //make variable for time
+                                        let RetrievalMinute = breakTimeArr[1]
+                                        
+                                        // convert formant HH:MM:SS.000000 to HH:MM:SS for RetrievalMinute
+                                        let formatTimeSplitter = RetrievalMinute.componentsSeparatedByString(".")
+                                        
+                                        // get the correct formatted time
+                                        let formatTimeLong = formatTimeSplitter[0]
+                                        
+                                        // hack way of getting just the HH:MM
+                                        let truncated01 = formatTimeLong.substringToIndex(formatTimeLong.endIndex.predecessor())
+                                        let truncated02 = truncated01.substringToIndex(truncated01.endIndex.predecessor())
+                                        let formatTime = truncated02.substringToIndex(truncated02.endIndex.predecessor())
+                                        
+                                        // convert date into a number from 1-7
+                                        if let numRetrievalDate = self.getDayOfWeek(RetrievalDate) {
+                                            
+                                            // ***filter further by specific day
+                                            if day == numRetrievalDate {
+                                                // filter to specified times
+                                                
+                                                // The arrival Time Historical
+                                                if time == formatTime {
+                                                    // get the available spots
+                                                    if let Display = data["Display"] as? Int {
+                                                        // return the amount of available spots 
+                                                        self.historical_arrival_available = Display
+                                                        
+                                                    }
+                                                }
+                                                
+                                                // the current Time Historical
+                                                if formatTime == self.getCurrentTime() {
+                                                    // get the available spots
+                                                    if let Display = data["Display"] as? Int {
+                                                        // return the amount of available spots
+                                                        self.historical_current_available = Display
+                                                        
+                                                    }
+                                                }
+                                                
+                                                // the current Time + 30 min Historical 
+                                                // we can view +30 min as an ETA and use that function
+                                                let arrivalRate = self.getArrivalTime(30)
+                                                
+                                                if formatTime == arrivalRate {
+                                                    // get the available spots
+                                                    if let Display = data["Display"] as? Int {
+                                                        // return the amount of available spots
+                                                        self.historical_rate = Display
+                                                    }
+                                                }
+                                                
+                                                
+                                            }
+                                        } else {
+                                            print("bad input on date")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }catch {
+                    print("Error with Json: \(error)")
+                }
+            }
+        }
+        new_task.resume()
+        // connected!
+    }
+
+    // get todays date
+    func getTodaysDate() -> Int{
+        let fullDate = NSDate()
+        let dateFormatter = NSDateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todaysDateFormatted = dateFormatter.stringFromDate(fullDate)
+        
+        let todaysDate = getDayOfWeek(todaysDateFormatted)
+        
+        return todaysDate!
+    }
+    
+    // get current time 
+    func getCurrentTime() -> String {
+        let fullDate = NSDate()
+        let dateFormatter = NSDateFormatter()
+        dateFormatter.dateFormat = "HH:mm"
+        let currentTime = dateFormatter.stringFromDate(fullDate)
+        
+        return currentTime
+
+    }
+    
+    // given an ETA this function will return a time that is equal to current time + eta
+    func getArrivalTime(eta:Int) -> String{
+        let fullDate = NSDate()
+        let calendar = NSCalendar.currentCalendar()
+        let arrivalDate = calendar.dateByAddingUnit(.Minute, value: eta, toDate: fullDate, options: [])
+        let dateFormatter = NSDateFormatter()
+        dateFormatter.dateFormat = "HH:mm"
+        let arrivalTime = dateFormatter.stringFromDate(arrivalDate!)
+        
+        return arrivalTime
+    }
+
+    
+    // get day of the week as int from 1-7 from a inputted string
+    func getDayOfWeek(today:String)->Int? {
+        
+        let formatter  = NSDateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        if let todayDate = formatter.dateFromString(today) {
+            let myCalendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
+            let myComponents = myCalendar.components(.Weekday, fromDate: todayDate)
+            let weekDay = myComponents.weekday
+            return weekDay
+        } else {
+            return nil
+        }
+    }
+    
+    
+    
+    func displayLocationInfo(placemark: CLPlacemark){
+        self.locationManager.stopUpdatingLocation()
+        
+        print(placemark.locality)
+        
+    }
+    
+    func locationManager(manager: CLLocationManager, didFailWithError error: NSError) {
+        print("Error" + error.localizedDescription)
+    }
+    
+    // *****************************************
+
     
     
     
@@ -153,7 +484,8 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
         lotPropertyInfo.addObject("\(lot["Service_Available"]!.integerValue) | \(lot["Service_Capacity"]!.integerValue)")
         lotPropertyInfo.addObject("\(lot["Hall_Director_Available"]!.integerValue) | \(lot["Hall_Director_Capacity"]!.integerValue)")
         lotPropertyInfo.addObject("\(lot["Misc_Available"]!.integerValue) | \(lot["Misc_Capacity"]!.integerValue)")
-
+        
+        
         
         // get spaces data from the reader
         let requestURL: NSURL = NSURL(string: "http://smartparkingapi.herokuapp.com/api/v1/spaces")!
@@ -205,6 +537,7 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
                         }
                         
                     }
+                
                     self.unique_tag_ids = Array(Set(found_tag_id))
                     self.occupied_spots = self.unique_tag_ids.count
                     print("Unique tag ids", self.unique_tag_ids)
@@ -213,6 +546,10 @@ class SingleLotViewController: UIViewController, UITableViewDataSource, UIPicker
                     //** Update the views with the Space data
                     self.lotGeneralSpotInfoLabel.text = "\(self.lot["General_Available"]!.integerValue-self.occupied_spots) | \(self.lot["General_Capacity"]!.integerValue)"
                     self.lotTotalSpotInfoLabel.text = "\(self.lot["Total_Available"]!.integerValue - self.occupied_spots) | \(self.lot["Total_Capacity"]!.integerValue)"
+
+                    // used to calculate probablility for given lot cap.
+                    self.lot_capacity = self.lot["Total_Available"]!.integerValue
+                    
                     
                 }catch {
                     print("Error with Json: \(error)")

@@ -41,6 +41,9 @@ class CreateLotViewControllerTwo: UIViewController {
     var lotId = Int()
     var lotName = String()
     var lotLocation = String()
+    var latitude = String()
+    var longitude = String()
+    var backup = String()
     
     var managementType = String()
     var createAttempts: Int = 0
@@ -83,6 +86,9 @@ class CreateLotViewControllerTwo: UIViewController {
             destination.lotName = lotNameTextField.text!
             destination.lotLocation = lotLocationTextField.text!
             destination.lotSpots = lotSpots
+            destination.latitude = latitude
+            destination.longitude = longitude
+            destination.backup = backup
             
             destination.calculateAvailableSpots()
             destination.calculateTotalSpots()
@@ -104,7 +110,7 @@ class CreateLotViewControllerTwo: UIViewController {
                 if checkAllLotSpotsAreEntered() == true {
                     
                     // Calls update lot function to save lot, returns true on success. If true, return to admin lots view
-                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/updateLot.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: lotId, lot: lotSpots)) == true {
+                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/updateLot.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: lotId, latitude: latitude, longitude: longitude, backup: backup, lot: lotSpots)) == true {
                         self.performSegueWithIdentifier("unwindToAdminLotsViewController", sender: nil)
                         
                         // else alert user something went wrong
@@ -145,7 +151,7 @@ class CreateLotViewControllerTwo: UIViewController {
                 if checkAllLotSpotsAreEntered() == true {
 
                     // Calls create lot function to create lot, returns true on success. If true, return to admin lots view
-                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/lotCreateIndividual.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: 876325, lot: lotSpots)) == true {
+                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/lotCreateIndividual.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: 876325, latitude: latitude, longitude: longitude, backup: backup, lot: lotSpots)) == true {
                             self.performSegueWithIdentifier("unwindToAdminLotsViewController", sender: nil)
                     
                         // else alert user something went wrong
@@ -222,7 +228,7 @@ class CreateLotViewControllerTwo: UIViewController {
         if managementType == "Manage" {
             
             createOrManageLotTitleLabel.text = "Manage Lot: \(lotName)..."
-            createOrSaveButtonLabel.setTitle("Save", forState: .Normal)
+//            createOrSaveButtonLabel.setTitle("Save", forState: .Normal)
             
             //            updateLotLabels()
             
@@ -230,7 +236,7 @@ class CreateLotViewControllerTwo: UIViewController {
             
             createOrManageLotTitleLabel.text = "Create Lot..."
             
-            createOrSaveButtonLabel.setTitle("Create", forState: .Normal)
+//            createOrSaveButtonLabel.setTitle("Create", forState: .Normal)
             
             deleteButtonLabel.hidden = true
             

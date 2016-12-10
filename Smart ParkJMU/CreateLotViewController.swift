@@ -20,6 +20,9 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
     var lotName: String = ""
     @IBOutlet weak var lotLocationTextField: UITextField!
     var lotLocation: String = ""
+    var latitude = String()
+    var longitude = String()
+    var backup = String()
     
     @IBOutlet weak var alertLabel: UILabel!
 
@@ -41,6 +44,12 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
     
     @IBOutlet weak var totalSpotsAvailableTextField: UILabel!
     @IBOutlet weak var totalSpotsTotalTextField: UILabel!
+    
+    
+    @IBOutlet weak var latitudeTextField: UITextField!
+    @IBOutlet weak var longitudeTextField: UITextField!
+    @IBOutlet weak var backupTextField: UITextField!
+    
     
     // Instance Variable for lotspots
     var lotSpots = ["genAvail": 876325, "genTotal": 876325,
@@ -137,6 +146,9 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
             destination.lotName = lotNameTextField.text!
             destination.lotLocation = lotLocationTextField.text!
             destination.lotSpots = lotSpots
+            destination.latitude = latitude
+            destination.longitude = longitude
+            destination.backup = backup
             
         }
     }
@@ -147,7 +159,15 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
         if let lotLoc = lot["Location"] as! String? {
             lotLocationTextField.text = lotLoc
         }
-        
+        if let latitude = lot["Latitude"] as! String?{
+            latitudeTextField.text = latitude
+        }
+        if let longitude = lot["Longitude"] as! String?{
+            longitudeTextField.text = longitude
+        }
+        if let backup = lot["Backup"] as! String?{
+            backupTextField.text = backup
+        }
         if let genAvail = lot["General_Available"]!.integerValue as Int? {
             generalSpotsAvailableTextField.text = String(genAvail)
             lotSpots["genAvail"] = genAvail
@@ -275,7 +295,7 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
                 if checkAllLotSpotsAreEntered() == true {
                     
                     // Calls update lot function to save lot, returns true on success. If true, return to admin lots view
-                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/updateLot.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: lotId, lot: lotSpots)) == true {
+                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/updateLot.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: lotId, latitude: latitudeTextField.text!, longitude: longitudeTextField.text!, backup: backupTextField.text!, lot: lotSpots)) == true {
                         self.performSegueWithIdentifier("unwindToAdminLotsViewController", sender: nil)
                         
                         // else alert user something went wrong
@@ -316,7 +336,7 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
                 if checkAllLotSpotsAreEntered() == true {
                     
                     // Calls create lot function to create lot, returns true on success. If true, return to admin lots view
-                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/lotCreateIndividual.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: 876325, lot: lotSpots)) == true {
+                    if (CreateLotViewController.createOrSaveLot("http://spacejmu.bitnamiapp.com/SPACEApiCalls/lotCreateIndividual.php", managementType: managementType, lotName: lotNameTextField.text!, lotLocation: lotLocationTextField.text!, lotId: 876325, latitude: latitudeTextField.text!, longitude: longitudeTextField.text!, backup: backupTextField.text!, lot: lotSpots)) == true {
                         self.performSegueWithIdentifier("unwindToAdminLotsViewController", sender: nil)
                         
                         // else alert user something went wrong
@@ -631,7 +651,7 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
     }
     
     // Function able to create or save lots depending on whether the passed in URL is for creating or updating a lot
-    class func createOrSaveLot(url: String, managementType: String, lotName: String, lotLocation: String, lotId: Int, lot: Dictionary<String, Int>) -> Bool {
+    class func createOrSaveLot(url: String, managementType: String, lotName: String, lotLocation: String, lotId: Int,latitude: String, longitude: String, backup: String, lot: Dictionary<String, Int>) -> Bool {
         
         let request = NSMutableURLRequest(URL: NSURL(string: url)!)
         
@@ -656,6 +676,9 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
         let miscTotal = Int(lot["miscTotal"]!)
         let totalAvail = Int(lot["totalAvail"]!)
         let totalTotal = Int(lot["totalTotal"]!)
+        let longitude = longitude
+        let latitude = latitude
+        let backup = backup
         
         
         var postString: String! = ""
@@ -664,11 +687,11 @@ class CreateLotViewController: UIViewController, UITextFieldDelegate {
         
         if managementType == "Manage" {
             
-            postString = "lotId=\(lotId)&lotName=\(lotName)&lotLocation=\(lotLocation)&genAvail=\(genAvail)&genTotal=\(genTotal)&meteredAvail=\(meteredAvail)&meteredTotal=\(meteredTotal)&visitorAvail=\(visitorAvail)&visitorTotal=\(visitorTotal)&handicapAvail=\(handicapAvail)&handicapTotal=\(handicapTotal)&motorcycleAvail=\(motorcycleAvail)&motorcycleTotal=\(motorcycleTotal)&serviceAvail=\(serviceAvail)&serviceTotal=\(serviceTotal)&housekeepingAvail=\(housekeepingAvail)&housekeepingTotal=\(housekeepingTotal)&hallDirectorAvail=\(hallDirectorAvail)&hallDirectorTotal=\(hallDirectorTotal)&miscAvail=\(miscAvail)&miscTotal=\(miscTotal)&totalAvail=\(totalAvail)&totalTotal=\(totalTotal)"
+            postString = "lotId=\(lotId)&lotName=\(lotName)&lotLocation=\(lotLocation)&latitude=\(latitude)&longitude=\(longitude)&genAvail=\(genAvail)&genTotal=\(genTotal)&meteredAvail=\(meteredAvail)&meteredTotal=\(meteredTotal)&visitorAvail=\(visitorAvail)&visitorTotal=\(visitorTotal)&handicapAvail=\(handicapAvail)&handicapTotal=\(handicapTotal)&motorcycleAvail=\(motorcycleAvail)&motorcycleTotal=\(motorcycleTotal)&serviceAvail=\(serviceAvail)&serviceTotal=\(serviceTotal)&housekeepingAvail=\(housekeepingAvail)&housekeepingTotal=\(housekeepingTotal)&hallDirectorAvail=\(hallDirectorAvail)&hallDirectorTotal=\(hallDirectorTotal)&miscAvail=\(miscAvail)&miscTotal=\(miscTotal)&totalAvail=\(totalAvail)&totalTotal=\(totalTotal)&backup=\(backup)"
 
         } else {
             
-            postString = "lotName=\(lotName)&lotLocation=\(lotLocation)&genAvail=\(genAvail)&genTotal=\(genTotal)&meteredAvail=\(meteredAvail)&meteredTotal=\(meteredTotal)&visitorAvail=\(visitorAvail)&visitorTotal=\(visitorTotal)&handicapAvail=\(handicapAvail)&handicapTotal=\(handicapTotal)&motorcycleAvail=\(motorcycleAvail)&motorcycleTotal=\(motorcycleTotal)&serviceAvail=\(serviceAvail)&serviceTotal=\(serviceTotal)&housekeepingAvail=\(housekeepingAvail)&housekeepingTotal=\(housekeepingTotal)&hallDirectorAvail=\(hallDirectorAvail)&hallDirectorTotal=\(hallDirectorTotal)&miscAvail=\(miscAvail)&miscTotal=\(miscTotal)&totalAvail=\(totalAvail)&totalTotal=\(totalTotal)"
+            postString = "lotName=\(lotName)&lotLocation=\(lotLocation)&latitude=\(latitude)&longitude=\(longitude)&genAvail=\(genAvail)&genTotal=\(genTotal)&meteredAvail=\(meteredAvail)&meteredTotal=\(meteredTotal)&visitorAvail=\(visitorAvail)&visitorTotal=\(visitorTotal)&handicapAvail=\(handicapAvail)&handicapTotal=\(handicapTotal)&motorcycleAvail=\(motorcycleAvail)&motorcycleTotal=\(motorcycleTotal)&serviceAvail=\(serviceAvail)&serviceTotal=\(serviceTotal)&housekeepingAvail=\(housekeepingAvail)&housekeepingTotal=\(housekeepingTotal)&hallDirectorAvail=\(hallDirectorAvail)&hallDirectorTotal=\(hallDirectorTotal)&miscAvail=\(miscAvail)&miscTotal=\(miscTotal)&totalAvail=\(totalAvail)&totalTotal=\(totalTotal)&backup=\(backup)"
             
         }
             
